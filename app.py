@@ -46,7 +46,7 @@ def home():
     """
     Endpoint utama untuk testing.
     """
-    return jsonify({"message": "Selamat datang di Flask REST API!"})
+    return render_template('index.html')
 
 
 @app.route('/hello/<name>', methods=['GET'])
