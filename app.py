@@ -1,14 +1,13 @@
-# app.py
 from flask import Flask, jsonify, request
 import time
 from prometheus_client import generate_latest, Counter, Histogram, Gauge
-import os
 import random
 from flask_cors import CORS
 
 
 app = Flask(__name__)
-CORS(app) # Tambahkan ini setelah app = Flask(__name__)
+CORS(app)  # Menambahkan dua spasi sebelum inline comment
+
 
 # Inisialisasi metrik Prometheus
 # Counter untuk menghitung total request
@@ -41,12 +40,14 @@ CUSTOM_COUNTER = Counter(
     'Contoh Counter Kustom Aplikasi'
 )
 
+
 @app.route('/')
 def home():
     """
     Endpoint utama untuk testing.
     """
     return jsonify({"message": "Selamat datang di Flask REST API!"})
+
 
 @app.route('/hello/<name>', methods=['GET'])
 def hello(name):
@@ -58,7 +59,7 @@ def hello(name):
         status_code = 200
         try:
             # Simulasi pekerjaan yang membutuhkan waktu
-            sleep_time = random.uniform(0.05, 0.5) # Antara 50ms dan 500ms
+            sleep_time = random.uniform(0.05, 0.5)  # Menambahkan dua spasi sebelum inline comment
             time.sleep(sleep_time)
             message = f"Halo, {name}!"
             return jsonify({"message": message})
@@ -104,7 +105,8 @@ def metrics():
     """
     return generate_latest(), 200, {'Content-Type': 'text/plain; version=0.0.4; charset=utf-8'}
 
+
+# Memastikan ada 2 baris kosong sebelum blok ini
 if __name__ == '__main__':
     # Pastikan aplikasi berjalan di port 5000, sesuai dengan konfigurasi Kubernetes
     app.run(debug=True, host='0.0.0.0', port=5000)
-
