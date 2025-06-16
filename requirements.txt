@@ -3,3 +3,4 @@ prometheus_client==0.17.0
 gunicorn==21.2.0
 flask-cors==4.0.0
 flake8==6.0.0 
+pytest
