@@ -4,7 +4,7 @@ pipeline {
     environment {
         IMAGE_NAME = "flask-api"
         IMAGE_TAG = "latest"
-        REGISTRY = "" // isi jika pakai docker registry, contoh: docker.io/username
+        REGISTRY = "docker.io/sultan877" // Ganti sesuai registry kamu
     }
 
     stages {
@@ -56,8 +56,6 @@ pipeline {
             }
         }
 
-        // Optional, kalau kamu mau push ke registry:
-        /*
         stage('Push Docker Image') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'docker-hub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
@@ -69,13 +67,15 @@ pipeline {
                 }
             }
         }
-        */
 
         stage('Deploy to Kubernetes') {
             steps {
-                sh '''
-                kubectl set image deployment/${IMAGE_NAME}-deployment ${IMAGE_NAME}-container=${IMAGE_NAME}:${IMAGE_TAG} -n flask-api-dev
-                '''
+                withCredentials([file(credentialsId: 'kubeconfig-dev', variable: 'KUBECONFIG_FILE')]) {
+                    sh '''
+                    export KUBECONFIG=$KUBECONFIG_FILE
+                    kubectl set image deployment/flask-api-deployment flask-api-container=${IMAGE_NAME}:${IMAGE_TAG} -n flask-api-dev
+                    '''
+                }
             }
         }
     }
