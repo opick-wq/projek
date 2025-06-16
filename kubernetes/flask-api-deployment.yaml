@@ -1,0 +1,43 @@
+# kubernetes/flask-api-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flask-api-deployment      # Nama Deployment
+  namespace: flask-api-dev       # Namespace yang telah Anda buat
+  labels:
+    app: flask-api               # Label untuk Deployment ini
+spec:
+  replicas: 2                    # Jalankan 2 instance Pod aplikasi Anda
+  selector:
+    matchLabels:
+      app: flask-api             # Memastikan Deployment menargetkan Pods dengan label ini
+  template:
+    metadata:
+      labels:
+        app: flask-api           # Label untuk Pods yang dibuat oleh Deployment ini
+    spec:
+      containers:
+      - name: flask-api-container
+        image: flask-api:latest  # Nama image Docker yang akan kita bangun
+        imagePullPolicy: IfNotPresent # Gunakan image lokal jika ada, atau pull jika tidak
+        ports:
+        - containerPort: 5000    # Port yang diekspos oleh container
+        resources:
+          requests:              # Permintaan sumber daya untuk setiap Pod
+            memory: "64Mi"
+            cpu: "200m"          # 20% dari satu CPU core
+          limits:                # Batas maksimum sumber daya untuk setiap Pod
+            memory: "128Mi"
+            cpu: "500m"          # 50% dari satu CPU core
+        livenessProbe:           # Probe untuk memeriksa apakah aplikasi masih responsif
+          httpGet:
+            path: /status
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        readinessProbe:          # Probe untuk memeriksa apakah aplikasi siap menerima lalu lintas
+          httpGet:
+            path: /status
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 3

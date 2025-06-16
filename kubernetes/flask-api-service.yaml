@@ -1,0 +1,19 @@
+# kubernetes/flask-api-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: flask-api-service         # Nama Service
+  namespace: flask-api-dev       # Namespace yang sama dengan Deployment
+  labels:
+    app: flask-api
+spec:
+  selector:
+    app: flask-api               # Service akan menargetkan Pods dengan label ini
+  ports:
+    - protocol: TCP
+      port: 80                   # Port yang akan digunakan Service di dalam cluster
+      targetPort: 5000           # Port container aplikasi Flask
+      nodePort: 30007            # Opsional: Tentukan NodePort statis (antara 30000-32767)
+                                 # Jika tidak ditentukan, Kubernetes akan memilih satu secara otomatis.
+                                 # Menggunakan statis lebih mudah untuk testing manual.
+  type: NodePort                 # Tipe Service yang mengekspos aplikasi di IP node pada port statis

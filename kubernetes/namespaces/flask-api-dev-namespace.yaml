@@ -1,0 +1,8 @@
+# kubernetes/namespaces/flask-api-dev-namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: flask-api-dev
+  labels:
+    environment: development
+    project: flask-api

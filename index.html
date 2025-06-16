@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Frontend Flask API</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light gray background */
+        }
+        /* Custom styles for better button appearance */
+        .btn {
+            @apply px-6 py-3 rounded-lg font-semibold shadow-md transition-all duration-300 ease-in-out;
+        }
+        .btn-primary {
+            @apply bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75;
+        }
+        .btn-secondary {
+            @apply bg-gray-200 text-gray-800 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75;
+        }
+        .btn-link {
+            @apply text-indigo-600 hover:text-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4 sm:p-6 lg:p-8">
+    <div class="bg-white p-6 sm:p-8 lg:p-10 rounded-xl shadow-2xl w-full max-w-md sm:max-w-lg lg:max-w-xl text-center space-y-6">
+        <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-6">Demo Flask REST API</h1>
+
+        <!-- Hello Endpoint Section -->
+        <div class="bg-gray-50 p-5 rounded-lg border border-gray-200 space-y-4">
+            <h2 class="text-xl sm:text-2xl font-semibold text-gray-800">Sapa Seseorang</h2>
+            <input type="text" id="nameInput" placeholder="Masukkan nama Anda"
+                   class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200">
+            <button id="helloButton" class="btn btn-primary w-full">Kirim Sapaan</button>
+            <p id="helloResponse" class="mt-4 text-gray-700 text-base sm:text-lg bg-indigo-50 p-3 rounded-lg border border-indigo-200"></p>
+        </div>
+
+        <!-- Status Endpoint Section -->
+        <div class="bg-gray-50 p-5 rounded-lg border border-gray-200 space-y-4">
+            <h2 class="text-xl sm:text-2xl font-semibold text-gray-800">Status API</h2>
+            <button id="statusButton" class="btn btn-secondary w-full">Cek Status API</button>
+            <p id="statusResponse" class="mt-4 text-gray-700 text-base sm:text-lg bg-gray-100 p-3 rounded-lg border border-gray-300"></p>
+        </div>
+
+        <!-- Metrics Link Section -->
+        <div class="bg-gray-50 p-5 rounded-lg border border-gray-200 space-y-4">
+            <h2 class="text-xl sm:text-2xl font-semibold text-gray-800">Metrik Prometheus</h2>
+            <a id="metricsLink" href="#" target="_blank" class="btn btn-link block w-full">Lihat Metrik Mentah</a>
+            <p class="text-sm text-gray-600 mt-2">Ini akan membuka endpoint /metrics secara langsung.</p>
+        </div>
+    </div>
+
+    <script>
+        // Konfigurasi URL API Anda
+        // Ganti '<MINIKUBE_IP>' dengan IP Minikube Anda (hasil dari `minikube ip`)
+        // Ganti '30007' dengan NodePort yang digunakan oleh Service Flask API Anda
+        const MINIKUBE_IP = '192.168.49.2'; // Ganti dengan IP Minikube Anda, misal: '192.168.49.2'
+        const NODE_PORT = '30007'; // Pastikan ini sesuai dengan flask-api-service.yaml Anda
+
+        const API_BASE_URL = `http://${MINIKUBE_IP}:${NODE_PORT}`;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const nameInput = document.getElementById('nameInput');
+            const helloButton = document.getElementById('helloButton');
+            const helloResponse = document.getElementById('helloResponse');
+            const statusButton = document.getElementById('statusButton');
+            const statusResponse = document.getElementById('statusResponse');
+            const metricsLink = document.getElementById('metricsLink');
+
+            // Set link untuk metrics endpoint
+            metricsLink.href = `${API_BASE_URL}/metrics`;
+
+            // Fungsi untuk memanggil endpoint /hello/<name>
+            helloButton.addEventListener('click', async () => {
+                const name = nameInput.value.trim();
+                if (!name) {
+                    helloResponse.textContent = 'Silakan masukkan nama!';
+                    helloResponse.classList.add('text-red-600');
+                    helloResponse.classList.remove('bg-indigo-50', 'border-indigo-200');
+                    helloResponse.classList.add('bg-red-100', 'border-red-300');
+                    return;
+                }
+
+                helloResponse.textContent = 'Memuat...';
+                helloResponse.classList.remove('text-red-600', 'bg-red-100', 'border-red-300');
+                helloResponse.classList.add('bg-indigo-50', 'border-indigo-200');
+
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/hello/${name}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    helloResponse.textContent = `Pesan: ${data.message}`;
+                    helloResponse.classList.remove('text-red-600', 'bg-red-100', 'border-red-300');
+                    helloResponse.classList.add('bg-indigo-50', 'border-indigo-200');
+                } catch (error) {
+                    helloResponse.textContent = `Error: ${error.message}`;
+                    helloResponse.classList.add('text-red-600');
+                    helloResponse.classList.remove('bg-indigo-50', 'border-indigo-200');
+                    helloResponse.classList.add('bg-red-100', 'border-red-300');
+                    console.error('Error fetching hello:', error);
+                }
+            });
+
+            // Fungsi untuk memanggil endpoint /status
+            statusButton.addEventListener('click', async () => {
+                statusResponse.textContent = 'Memuat...';
+                statusResponse.classList.remove('text-red-600', 'bg-red-100', 'border-red-300');
+                statusResponse.classList.add('bg-gray-100', 'border-gray-300');
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/status`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    statusResponse.textContent = `Status: ${data.status}, Versi: ${data.version}`;
+                    statusResponse.classList.remove('text-red-600', 'bg-red-100', 'border-red-300');
+                    statusResponse.classList.add('bg-gray-100', 'border-gray-300');
+                } catch (error) {
+                    statusResponse.textContent = `Error: ${error.message}`;
+                    statusResponse.classList.add('text-red-600');
+                    statusResponse.classList.remove('bg-gray-100', 'border-gray-300');
+                    statusResponse.classList.add('bg-red-100', 'border-red-300');
+                    console.error('Error fetching status:', error);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
