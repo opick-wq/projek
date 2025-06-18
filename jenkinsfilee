@@ -1,0 +1,74 @@
+pipeline {
+    // Change 'agent any' to use a Docker image with Python pre-installed
+    agent {
+        docker {
+            image 'python:3.9-slim-buster' // Use a Python-specific image (e.g., Python 3.9 on Debian Slim)
+            args '-u root' // Add this if you encounter permission issues within the container
+        }
+    }
+
+    environment {
+        IMAGE_NAME = "riansp457/kelompok4-credentials"
+        IMAGE_TAG = "${BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Install Dependencies') {
+            steps {
+                // Now 'pip' will be available inside the Docker container
+                sh 'pip install -r requirements.txt'
+            }
+        }
+
+        stage('Linting') {
+            steps {
+                // 'pip' is also available here
+                sh 'pip install flake8 && flake8 app.py'
+            }
+        }
+
+        stage('Unit Test') {
+            steps {
+                sh 'pytest || true'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    // Docker commands generally work on the host, but the pipeline context is still within the agent's environment
+                    dockerImage = docker.build("${env.IMAGE_NAME}:${env.IMAGE_TAG}")
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                withDockerRegistry([ credentialsId: 'dockerhub-credentials', url: '' ]) {
+                    script {
+                        dockerImage.push()
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh '''
+                kubectl apply -f kubernetes/namespaces/
+                kubectl apply -f kubernetes/flask-api-deployment.yaml
+                kubectl apply -f kubernetes/flask-api-service.yaml
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Deployment Success!'
+        }
+        failure {
+            echo '❌ Deployment Failed.'
+        }
+    }
+}
