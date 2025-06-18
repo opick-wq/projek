@@ -1,9 +1,9 @@
 pipeline {
-    // Change 'agent any' to use a Docker image with Python pre-installed
+    // Corrected agent block
     agent {
-        docker {
-            image 'python:3.9-slim-buster' // Use a Python-specific image (e.g., Python 3.9 on Debian Slim)
-            args '-u root' // Add this if you encounter permission issues within the container
+        dockerContainer { // <--- Change 'docker' to 'dockerContainer' here
+            image 'python:3.9-slim-buster'
+            args '-u root'
         }
     }
 
@@ -15,14 +15,12 @@ pipeline {
     stages {
         stage('Install Dependencies') {
             steps {
-                // Now 'pip' will be available inside the Docker container
                 sh 'pip install -r requirements.txt'
             }
         }
 
         stage('Linting') {
             steps {
-                // 'pip' is also available here
                 sh 'pip install flake8 && flake8 app.py'
             }
         }
@@ -36,7 +34,6 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Docker commands generally work on the host, but the pipeline context is still within the agent's environment
                     dockerImage = docker.build("${env.IMAGE_NAME}:${env.IMAGE_TAG}")
                 }
             }
