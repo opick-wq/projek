@@ -1,70 +1,91 @@
 pipeline {
-    // Corrected agent block
-    agent {
-        dockerContainer { // <--- Change 'docker' to 'dockerContainer' here
-            image 'python:3.9-slim-buster'
-        }
-    }
+    agent any
 
     environment {
-        IMAGE_NAME = "riansp457/kelompok4-credentials"
-        IMAGE_TAG = "${BUILD_NUMBER}"
+        IMAGE_NAME = "flask-api"
+        IMAGE_TAG = "latest"
+        REGISTRY = "docker.io/riansp457" // Ganti sesuai registry kamu
     }
 
     stages {
-        stage('Install Dependencies') {
+        stage('Checkout') {
             steps {
-                sh 'pip install -r requirements.txt'
+                checkout scm
+            }
+        }
+
+        stage('Setup Python & Install Dependencies') {
+            steps {
+                sh '''
+                python3 -m venv .venv
+                . .venv/bin/activate
+                pip install --upgrade pip
+                pip install -r requirements.txt
+                '''
             }
         }
 
         stage('Linting') {
             steps {
-                sh 'pip install flake8 && flake8 app.py'
+                sh '''
+                . .venv/bin/activate
+                flake8 --max-line-length=120 --exclude=.venv .
+                '''
             }
         }
 
-        stage('Unit Test') {
+        stage('Testing') {
             steps {
-                sh 'pytest || true'
+                sh '''
+                . .venv/bin/activate
+                pytest --junitxml=reports/junit.xml
+                '''
+            }
+            post {
+                always {
+                    junit 'reports/junit.xml'
+                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    dockerImage = docker.build("${env.IMAGE_NAME}:${env.IMAGE_TAG}")
-                }
+                sh '''
+                docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                '''
             }
         }
 
-        stage('Push to Docker Hub') {
+        stage('Push Docker Image') {
             steps {
-                withDockerRegistry([ credentialsId: 'dockerhub-credentials', url: '' ]) {
-                    script {
-                        dockerImage.push()
-                    }
+                withCredentials([usernamePassword(credentialsId: 'kelompok-4-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                    docker push ${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                    '''
                 }
             }
         }
 
         stage('Deploy to Kubernetes') {
             steps {
-                sh '''
-                kubectl apply -f kubernetes/namespaces/flask-api-dev-namespace.yaml
-                kubectl apply -f kubernetes/flask-api-deployment.yaml
-                kubectl apply -f kubernetes/flask-api-service.yaml
-                '''
+                withCredentials([file(credentialsId: 'kubeconfig-dev', variable: 'KUBECONFIG_FILE')]) {
+                    sh '''
+                    export KUBECONFIG=$KUBECONFIG_FILE
+                    kubectl set image deployment/flask-api-deployment flask-api-container=${IMAGE_NAME}:${IMAGE_TAG} -n flask-api-dev
+                    '''
+                }
             }
         }
     }
 
     post {
-        success {
-            echo '✅ Deployment Success!'
-        }
         failure {
-            echo '❌ Deployment Failed.'
+            echo "Pipeline gagal, cek log untuk detailnya."
+        }
+        success {
+            echo "Pipeline selesai sukses!"
         }
     }
 }
