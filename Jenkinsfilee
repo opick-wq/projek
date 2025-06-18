@@ -3,7 +3,6 @@ pipeline {
     agent {
         dockerContainer { // <--- Change 'docker' to 'dockerContainer' here
             image 'python:3.9-slim-buster'
-            args '-u root'
         }
     }
 
