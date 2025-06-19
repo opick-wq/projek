@@ -4,33 +4,29 @@ from prometheus_client import generate_latest, Counter, Histogram, Gauge
 import random
 from flask_cors import CORS
 
-
 app = Flask(__name__)
-CORS(app)  # Menambahkan dua spasi sebelum inline comment
-
+CORS(app)
 
 # Inisialisasi metrik Prometheus
-# Counter untuk menghitung total request
 REQUESTS_TOTAL = Counter(
     'http_requests_total',
     'Total HTTP Requests',
     ['method', 'endpoint', 'status_code']
 )
 
-# Histogram untuk melacak durasi respons
 REQUEST_DURATION_SECONDS = Histogram(
     'http_request_duration_seconds',
     'HTTP Request Duration in Seconds',
     ['method', 'endpoint']
 )
 
-# Gauge untuk melacak jumlah concurrent requests (opsional, bisa lebih kompleks)
+# --- METRIK IN-FLIGHT ---
+# Gauge ini akan naik saat request masuk dan turun saat selesai.
 IN_FLIGHT_REQUESTS = Gauge(
     'http_in_flight_requests',
     'Number of HTTP requests currently in flight'
 )
 
-# Contoh metrik aplikasi kustom (bisa Anda sesuaikan)
 CUSTOM_GAUGE = Gauge(
     'app_custom_gauge',
     'Contoh Gauge Kustom Aplikasi'
@@ -39,6 +35,59 @@ CUSTOM_COUNTER = Counter(
     'app_custom_counter_total',
     'Contoh Counter Kustom Aplikasi'
 )
+
+@app.before_request
+def before_request_hook():
+    """
+    Hook yang dijalankan sebelum setiap request.
+    """
+    # Catat waktu mulai request
+    request.start_time = time.time()
+    # [FIX] Naikkan (increment) counter untuk in-flight requests.
+    # Baris ini sebelumnya di-nonaktifkan (commented out).
+    IN_FLIGHT_REQUESTS.inc()
+
+@app.after_request
+def after_request_hook(response):
+    """
+    Hook yang dijalankan setelah setiap request, sebelum response dikirim.
+    """
+    # Dapatkan waktu mulai dari objek request
+    duration = time.time() - request.start_time
+    
+    # Dapatkan nama endpoint yang sebenarnya atau path jika tidak diketahui
+    endpoint_label = request.path 
+    if request.url_rule:
+        endpoint_label = request.url_rule.rule
+
+    # Pastikan status_code adalah string untuk label Prometheus
+    status_code_str = str(response.status_code)
+
+    # Catat metrik durasi
+    REQUEST_DURATION_SECONDS.labels(request.method, endpoint_label).observe(duration)
+
+    # Catat total request dengan status_code yang sebenarnya
+    REQUESTS_TOTAL.labels(request.method, endpoint_label, status_code_str).inc()
+
+    # [FIX] Turunkan (decrement) counter untuk in-flight requests.
+    # Baris ini sebelumnya di-nonaktifkan (commented out).
+    IN_FLIGHT_REQUESTS.dec()
+
+    return response
+
+# Error handler untuk menangkap 500 internal server error
+@app.errorhandler(500)
+def internal_error(error):
+    # after_request akan tetap dipanggil, jadi metrik akan tercatat di sana.
+    app.logger.error(f"Internal server error: {error}")
+    return jsonify({"error": "Internal Server Error"}), 500
+
+# Error handler untuk menangkap 404 Not Found
+@app.errorhandler(404)
+def not_found_error(error):
+    # after_request akan tetap dipanggil, jadi metrik akan tercatat di sana.
+    app.logger.error(f"Not found error: {request.path}")
+    return jsonify({"error": "Not Found"}), 404
 
 
 @app.route('/')
@@ -54,26 +103,20 @@ def hello(name):
     """
     Endpoint sapaan yang menerima nama.
     """
-    with IN_FLIGHT_REQUESTS.track_inprogress():
-        start_time = time.time()
-        status_code = 200
-        try:
-            # Simulasi pekerjaan yang membutuhkan waktu
-            sleep_time = random.uniform(0.05, 0.5)  # Menambahkan dua spasi sebelum inline comment
-            time.sleep(sleep_time)
-            message = f"Halo, {name}!"
-            return jsonify({"message": message})
-        except Exception as e:
-            status_code = 500
-            app.logger.error(f"Error di /hello/{name}: {e}")
-            return jsonify({"error": "Internal Server Error"}), 500
-        finally:
-            duration = time.time() - start_time
-            REQUEST_DURATION_SECONDS.labels(request.method, '/hello/<name>').observe(duration)
-            REQUESTS_TOTAL.labels(request.method, '/hello/<name>', status_code).inc()
-            # Contoh memperbarui metrik kustom
-            CUSTOM_GAUGE.set(random.randint(1, 100))
-            CUSTOM_COUNTER.inc()
+    # Untuk simulasi, jika nama adalah 'slow', buat request berjalan lama
+    if name.lower() == "slow":
+        sleep_time = 20  # Tidur selama 20 detik
+    else:
+        sleep_time = random.uniform(0.05, 0.5)
+
+    time.sleep(sleep_time)
+    message = f"Halo, {name}!"
+    
+    # Contoh memperbarui metrik kustom
+    CUSTOM_GAUGE.set(random.randint(1, 100))
+    CUSTOM_COUNTER.inc()
+    
+    return jsonify({"message": message})
 
 
 @app.route('/status', methods=['GET'])
@@ -81,21 +124,8 @@ def status():
     """
     Endpoint untuk memeriksa status aplikasi.
     """
-    with IN_FLIGHT_REQUESTS.track_inprogress():
-        start_time = time.time()
-        status_code = 200
-        try:
-            # Logika sederhana untuk status
-            app_status = {"status": "ok", "version": "1.0.0"}
-            return jsonify(app_status)
-        except Exception as e:
-            status_code = 500
-            app.logger.error(f"Error di /status: {e}")
-            return jsonify({"error": "Internal Server Error"}), 500
-        finally:
-            duration = time.time() - start_time
-            REQUEST_DURATION_SECONDS.labels(request.method, '/status').observe(duration)
-            REQUESTS_TOTAL.labels(request.method, '/status', status_code).inc()
+    app_status = {"status": "ok", "version": "1.0.0"}
+    return jsonify(app_status)
 
 
 @app.route('/metrics')
@@ -106,7 +136,7 @@ def metrics():
     return generate_latest(), 200, {'Content-Type': 'text/plain; version=0.0.4; charset=utf-8'}
 
 
-# Memastikan ada 2 baris kosong sebelum blok ini
 if __name__ == '__main__':
-    # Pastikan aplikasi berjalan di port 5000, sesuai dengan konfigurasi Kubernetes
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Pastikan debug=False saat menjalankan di lingkungan produksi
+    # agar tidak menangani exception secara internal.
+    app.run(debug=False, host='0.0.0.0', port=5000)
