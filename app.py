@@ -155,7 +155,7 @@ def status():
 def trigger_error():
     """Endpoint untuk sengaja memicu error 500."""
     # Ini akan menyebabkan TypeError, yang akan ditangani oleh @app.errorhandler(500)
-    result = 1 / 0 # noqa: F841
+    result = 1 / 0  # noqa: F841
     return "This will not be returned"
 
 
