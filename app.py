@@ -11,7 +11,7 @@ CORS(app)
 # --- Definisi Metrik Prometheus ---
 
 # COUNTER: Menghitung total permintaan HTTP yang masuk.
-# Labelnya adalah method (GET, POST), endpoint (misal, '/hello/<name>'), 
+# Labelnya adalah method (GET, POST), endpoint (misal, '/hello/<name>'),
 # dan status_code (misal, '200', '404', '500').
 REQUESTS_TOTAL = Counter(
     'http_requests_total',
@@ -46,6 +46,7 @@ CUSTOM_COUNTER = Counter(
 
 # --- Hooks Middleware ---
 
+
 @app.before_request
 def before_request_hook():
     """
@@ -54,6 +55,7 @@ def before_request_hook():
     """
     request.start_time = time.time()
     IN_FLIGHT_REQUESTS.inc()
+
 
 @app.after_request
 def after_request_hook(response):
@@ -64,10 +66,10 @@ def after_request_hook(response):
     """
     # Hitung durasi request
     duration = time.time() - request.start_time
-    
+
     # Dapatkan nama endpoint yang terdaftar di Flask (misal: '/hello/<name>')
     # Jika endpoint tidak cocok (misal, 404), gunakan path URL mentah.
-    endpoint_label = request.path 
+    endpoint_label = request.path
     if request.url_rule:
         endpoint_label = request.url_rule.rule
 
@@ -92,6 +94,7 @@ def after_request_hook(response):
 
 # --- Error Handlers ---
 
+
 @app.errorhandler(500)
 def internal_error(error):
     """
@@ -101,6 +104,7 @@ def internal_error(error):
     """
     app.logger.error(f"Internal server error: {error}")
     return jsonify({"error": "Internal Server Error"}), 500
+
 
 @app.errorhandler(404)
 def not_found_error(error):
@@ -114,6 +118,7 @@ def not_found_error(error):
 
 
 # --- Endpoints Aplikasi ---
+
 
 @app.route('/')
 def home():
@@ -131,11 +136,11 @@ def hello(name):
 
     time.sleep(sleep_time)
     message = f"Halo, {name}!"
-    
+
     # Contoh memperbarui metrik kustom
     CUSTOM_GAUGE.set(random.randint(1, 100))
     CUSTOM_COUNTER.inc()
-    
+
     return jsonify({"message": message})
 
 
@@ -144,6 +149,7 @@ def status():
     """Endpoint untuk memeriksa status aplikasi."""
     app_status = {"status": "ok", "version": "1.0.0"}
     return jsonify(app_status)
+
 
 @app.route('/error', methods=['GET'])
 def trigger_error():
